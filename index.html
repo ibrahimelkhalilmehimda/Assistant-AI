@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interface Chatbot Streaming</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #f4f7f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 750px;
+      height: 90vh;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 20px;
+      background-color: #0f172a;
+      color: #ffffff;
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .chat-box {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.5;
+      font-size: 0.95rem;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background-color: #2563eb;
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+
+    .message.bot {
+      align-self: flex-start;
+      background-color: #f1f5f9;
+      color: #1e293b;
+      border-bottom-left-radius: 2px;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Animation du curseur de frappe */
+    .cursor::after {
+      content: '▋';
+      display: inline-block;
+      vertical-align: baseline;
+      animation: blink 1s infinite;
+      color: #2563eb;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .chat-input-area {
+      padding: 15px;
+      border-top: 1px solid #e2e8f0;
+      background-color: #ffffff;
+    }
+
+    .input-form {
+      display: flex;
+      gap: 10px;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      outline: none;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+    }
+
+    .chat-input:focus {
+      border-color: #2563eb;
+    }
+
+    .send-btn {
+      padding: 12px 24px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .send-btn:hover {
+      background-color: #1d4ed8;
+    }
+
+    .send-btn:disabled {
+      background-color: #94a3b8;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="chat-container">
+    <div class="chat-header">
+      Assistant AI
+    </div>
+    
+    <div class="chat-box" id="chatBox">
+      <div class="message bot">Hello ! How Can I help you ?</div>
+    </div>
+
+    <div class="chat-input-area">
+      <form class="input-form" id="chatForm">
+        <input 
+          type="text" 
+          id="userInput" 
+          class="chat-input" 
+          placeholder="Type your question here..." 
+          autocomplete="off"
+          required
+        />
+        <button type="submit" id="sendBtn" class="send-btn">Send</button>
+      </form>
+    </div>
+  </div>
+ 
+
+ <script>
+    const chatForm = document.getElementById('chatForm');
+    const userInput = document.getElementById('userInput');
+    const chatBox = document.getElementById('chatBox');
+    const sendBtn = document.getElementById('sendBtn');
+    const API_URL = 'http://localhost:8000/api/chat';
+
+    // Fonction pour ajouter un message à la boîte de chat
+    function appendMessage(text, sender) {
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('message', sender);
+      messageDiv.textContent = text;
+      chatBox.appendChild(messageDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return messageDiv;
+    }
+
+    // Écouteur d'événement sur la soumission du formulaire
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault(); // Empêche le rechargement de la page
+
+      const question = userInput.value.trim();
+      if (!question) return;
+
+      // 1. Ajouter la question de l'utilisateur à l'écran
+      appendMessage(question, 'user');
+      userInput.value = '';
+      sendBtn.disabled = true;
+
+      // 2. Créer la bulle de message pour le bot (en attente)
+      const botMessageElement = appendMessage('Réflexion en cours...', 'bot');
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ question: question })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP : ${response.status}`);
+        }
+
+        const data = await response.json();
+        const fullText = data.res || "Réponse vide de l'API.";
+        
+        // Mettre à jour le message du bot avec la réponse
+        botMessageElement.textContent = fullText;
+
+      } catch (error) {
+        console.error('Erreur :', error);
+        botMessageElement.textContent = "Désolé, une erreur s'est produite lors de la connexion au serveur.";
+      } finally {
+        sendBtn.disabled = false;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+    });
+  </script>
+  </body>
+</html>
